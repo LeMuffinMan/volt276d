@@ -4,8 +4,11 @@ use std::os::unix::io::AsRawFd;
 
 // Source: <linux/input.h>
 pub const EV_ABS: libc::c_int = 0x03; // event type "absolute axis"
+pub const EV_SW: libc::c_int = 0x05;  // event type "switch"
 pub const ABS_X: libc::c_int = 0x00; // axis X → compressor input 1
 pub const ABS_Y: libc::c_int = 0x01; // axis Y → compressor input 2
+pub const SW_VINTAGE_1: libc::c_int = 0x00; // vintage input 1 (SW slot 0)
+pub const SW_VINTAGE_2: libc::c_int = 0x01; // vintage input 2 (SW slot 1)
 
 // Source: <linux/uinput.h> — ioctl numbers calculated with _IOW('U', n, type)
 // _IOW('U'=0x55, 100=0x64, int=4)             → 0x40045564
@@ -20,6 +23,8 @@ const UI_DEV_DESTROY: libc::c_ulong = 0x5502;
 const UI_DEV_SETUP: libc::c_ulong = 0x405c5503;
 // _IOW('U'=0x55, 4, uinput_abs_setup=28=0x1c) → 0x401c5504
 const UI_ABS_SETUP: libc::c_ulong = 0x401c5504;
+// _IOW('U'=0x55, 109=0x6d, int=4)             → 0x4004556d
+const UI_SET_SWBIT: libc::c_ulong = 0x4004556d;
 
 // repr(C) ensures field layout matches the C struct — required for kernel ioctls
 // kernel needs device identity, name, and force-feedback count (unused here)
@@ -86,6 +91,11 @@ pub fn create_uinput_device(path: &str) -> io::Result<UinputDevice> {
     // two compressors
     unsafe { libc::ioctl(file.as_raw_fd(), UI_SET_ABSBIT, ABS_X) };
     unsafe { libc::ioctl(file.as_raw_fd(), UI_SET_ABSBIT, ABS_Y) };
+
+    // EV_SW for vintage on/off toggles (no range setup needed for switches)
+    unsafe { libc::ioctl(file.as_raw_fd(), UI_SET_EVBIT, EV_SW) };
+    unsafe { libc::ioctl(file.as_raw_fd(), UI_SET_SWBIT, SW_VINTAGE_1) };
+    unsafe { libc::ioctl(file.as_raw_fd(), UI_SET_SWBIT, SW_VINTAGE_2) };
 
     for code in [ABS_X as u16, ABS_Y as u16] {
         let abs_setup = UinputAbsSetup {
